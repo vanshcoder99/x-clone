@@ -7,43 +7,68 @@ datasource db {
   provider = "postgresql"
 }
 
-
-model User{
-  id String @id @default(cuid())
-  username String @unique
-  email String @unique
-  password String
-  bio String?
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String?  // null for Google-only users
+  provider  AuthProvider @default(LOCAL)
+  firebaseUid String? @unique // only set for Google users
+  bio       String?
   avatarUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  tweets Tweet[]
-  likes Like[]
-  retweets Retweet[]
-  follower Follow[] @relation("Followers")
+
+  refreshTokens RefreshToken[]
+  tweets        Tweet[]
+  likes         Like[]
+  retweets      Retweet[]
+  bookmarks     Bookmark[]
+
+  followers Follow[] @relation("Followers")
   following Follow[] @relation("Following")
-  bookmarks Bookmark[]
+
   blocking  Block[] @relation("Blocking")
   blockedBy Block[] @relation("BlockedBy")
+
+  notifications          Notification[] @relation("NotificationRecipient")
+  triggeredNotifications Notification[] @relation("NotificationSource")
 }
 
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
 
 model Tweet {
-  id String @id @default(cuid())
-  content String
-  imageUrl String?
-  mediaUrl String?
+  id        String     @id @default(cuid())
+  content   String
+  mediaUrl  String?
   mediaType MediaType?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
   authorId String
-  author User @relation(fields: [authorId],references: [id],onDelete: Cascade)
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
   parentTweetId String?
-  parentTweet Tweet? @relation("Replies",fields: [parentTweetId],references: [id],onDelete: NoAction,onUpdate: NoAction)
-  replies Tweet[] @relation("Replies")
-  likes Like[]
-  retweets Retweet[]
-  bookmarks Bookmark[]
+  parentTweet   Tweet?  @relation("Replies", fields: [parentTweetId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies       Tweet[] @relation("Replies")
+
+  likes         Like[]
+  retweets      Retweet[]
+  bookmarks     Bookmark[]
+  notifications Notification[]
+  hashtags      TweetHashtag[]
 }
 
 enum MediaType {
@@ -52,58 +77,93 @@ enum MediaType {
   GIF
 }
 
-model Like{
-  id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId],references: [id],onDelete: Cascade)
-  tweetId String
-  tweet Tweet @relation(fields: [tweetId],references: [id],onDelete: Cascade)
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tweetId   String
+  tweet     Tweet    @relation(fields: [tweetId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@unique([userId,tweetId])
-}
 
+  @@unique([userId, tweetId])
+}
 
 model Retweet {
-  id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId],references: [id],onDelete: Cascade)
-  tweetId String
-  tweet Tweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tweetId      String
+  tweet        Tweet    @relation(fields: [tweetId], references: [id], onDelete: Cascade)
   quoteContent String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@unique([userId,tweetId])
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, tweetId])
 }
 
-
 model Follow {
-  id String @id @default(cuid())
-  followerId String
-  follower User @relation("Following",fields: [followerId],references: [id],onDelete: Cascade)
+  id          String   @id @default(cuid())
+  followerId  String
+  follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
   followingId String
-  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
   @@unique([followerId, followingId])
 }
 
-
 model Bookmark {
-  id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId],references: [id],onDelete: Cascade)
-  tweetId String
-  tweet Tweet @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tweetId   String
+  tweet     Tweet    @relation(fields: [tweetId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@unique([userId, tweetId])
 }
 
 model Block {
-  id String @id @default(cuid())
+  id        String   @id @default(cuid())
   blockerId String
-  blocker User @relation("Blocking",fields: [blockerId],references: [id],onDelete: Cascade)
-  blocked User @relation("BlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker   User     @relation("Blocking", fields: [blockerId], references: [id], onDelete: Cascade)
   blockedId String
-  @@unique([blockerId,blockedId])
+  blocked   User     @relation("BlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+model Notification {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  sourceUserId String
+  sourceUser   User             @relation("NotificationSource", fields: [sourceUserId], references: [id], onDelete: Cascade)
+  type         NotificationType
+  tweetId      String?
+  tweet        Tweet?           @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  read         Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+}
+
+enum NotificationType {
+  LIKE
+  RETWEET
+  FOLLOW
+  REPLY
+}
+
+model Hashtag {
+  id     String         @id @default(cuid())
+  tag    String         @unique
+  tweets TweetHashtag[]
+}
+
+model TweetHashtag {
+  tweetId   String
+  hashtagId String
+  tweet     Tweet   @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  hashtag   Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@id([tweetId, hashtagId])
 }
