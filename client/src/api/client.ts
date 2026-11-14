@@ -1,11 +1,12 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const rawApiUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").trim().replace(/\/$/, "");
+const API_BASE_URL = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
 
 export const api = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true, // Enables cookies for refreshToken
-    timeout: 10000, // 10-second request timeout to prevent indefinite loading spinners
+    timeout: 15000, // Request timeout to prevent indefinite loading spinners
     headers: {
         "Content-Type": "application/json",
     },

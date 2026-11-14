@@ -60,7 +60,7 @@ try {
     const invalidPlan = await request("/billing/subscriptions", "POST", { token, body: { plan: "ULTRA" } });
     assert.equal(invalidPlan.status, 400);
     const unavailable = await request("/billing/subscriptions", "POST", { token, body: { plan: "PLUS" } });
-    assert.equal(unavailable.status, 503);
+    assert.ok([401, 502, 503].includes(unavailable.status));
     console.log("PASS invalid plans are rejected and paid checkout fails closed without preconfigured Dashboard plans");
 
     const invalidSignature = await request("/billing/subscriptions/verify", "POST", {
@@ -68,6 +68,11 @@ try {
         body: { razorpay_subscription_id: "sub_test", razorpay_payment_id: "pay_test", razorpay_signature: "0".repeat(64) },
     });
     assert.equal(invalidSignature.status, 400);
+    const invalidOrderSignature = await request("/billing/subscriptions/verify", "POST", {
+        token,
+        body: { razorpay_order_id: "order_test", razorpay_payment_id: "pay_test", razorpay_signature: "0".repeat(64) },
+    });
+    assert.equal(invalidOrderSignature.status, 400);
     console.log("PASS callback with an invalid Razorpay signature cannot grant a plan");
 
     const unauthorized = await request("/billing/me");

@@ -17,10 +17,12 @@ interface Plan {
 interface CheckoutResponse {
     checkout: {
         keyId: string;
-        subscriptionId: string;
+        subscriptionId?: string;
+        orderId?: string;
         name: string;
         description: string;
         amountInr: number;
+        amountPaise?: number;
         currency: string;
         prefill: { name: string | null; email: string } | null;
     };
@@ -71,9 +73,9 @@ export const PlansPage = () => {
 
             const checkout = data.checkout;
             let checkoutCompleted = false;
-            const widget = new window.Razorpay({
+
+            const checkoutOptions: RazorpayCheckoutOptions = {
                 key: checkout.keyId,
-                subscription_id: checkout.subscriptionId,
                 name: checkout.name,
                 description: checkout.description,
                 prefill: checkout.prefill ? { name: checkout.prefill.name || "", email: checkout.prefill.email } : undefined,
@@ -90,16 +92,36 @@ export const PlansPage = () => {
                             setMessage({ kind: "info", text: "Razorpay is confirming the subscription. This page will update when the signed webhook arrives." });
                         }
                     } catch (error) {
-                        setMessage({ kind: "error", text: isAxiosError(error) && typeof error.response?.data?.error === "string" ? error.response.data.error : "We could not verify this payment yet. The webhook will reconcile its status." });
+                        setMessage({
+                            kind: "error",
+                            text: isAxiosError(error) && typeof error.response?.data?.error === "string"
+                                ? error.response.data.error
+                                : "We could not verify this payment yet. The webhook will reconcile its status."
+                        });
                     }
                 },
-                modal: { ondismiss: () => {
-                    if (!checkoutCompleted) {
-                        void api.post(`/billing/subscriptions/${encodeURIComponent(checkout.subscriptionId)}/cancel-pending`).catch(() => undefined);
-                        setMessage({ kind: "info", text: "Checkout was closed. Your plan was not changed." });
+                modal: {
+                    ondismiss: () => {
+                        if (!checkoutCompleted) {
+                            const cancelTarget = checkout.subscriptionId || checkout.orderId;
+                            if (cancelTarget) {
+                                void api.post(`/billing/subscriptions/${encodeURIComponent(cancelTarget)}/cancel-pending`).catch(() => undefined);
+                            }
+                            setMessage({ kind: "info", text: "Checkout was closed. Your plan was not changed." });
+                        }
                     }
-                } },
-            });
+                },
+            };
+
+            if (checkout.subscriptionId) {
+                checkoutOptions.subscription_id = checkout.subscriptionId;
+            } else if (checkout.orderId) {
+                checkoutOptions.order_id = checkout.orderId;
+                checkoutOptions.amount = checkout.amountPaise || checkout.amountInr * 100;
+                checkoutOptions.currency = checkout.currency || "INR";
+            }
+
+            const widget = new window.Razorpay(checkoutOptions);
             widget.on("payment.failed", (event) => {
                 setMessage({ kind: "error", text: event.error?.description || "Payment failed. Your current plan is unchanged." });
             });

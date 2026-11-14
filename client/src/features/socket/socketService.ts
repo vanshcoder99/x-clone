@@ -22,14 +22,15 @@ export const connectSocket = (userId: string, dispatch: AppDispatch) => {
         dispatch(setUnreadDMConversations(unread));
     }).catch(() => undefined);
 
-    const socketUrl = import.meta.env.VITE_API_URL
-        ? import.meta.env.VITE_API_URL.replace("/api", "")
-        : "http://localhost:5000";
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || (import.meta.env.VITE_API_URL
+        ? import.meta.env.VITE_API_URL.trim().replace(/\/api\/?$/, "").replace(/\/$/, "")
+        : "http://localhost:5000");
     const token = getAccessToken();
     const socket = io(socketUrl, {
         withCredentials: true,
         auth: { token: token || undefined },
         autoConnect: true,
+        transports: ["websocket", "polling"],
     });
     activeSocket = socket;
     dispatch(socketCreated());

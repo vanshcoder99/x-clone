@@ -40,9 +40,32 @@ export const prisma = new PrismaClient({
 
 const app = express();
 
+// Trust reverse proxy (Render, Cloudflare, etc.) so secure HTTPS cookies and client IP resolution work
+app.set("trust proxy", 1);
+
+const rawClientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+const allowedOrigins = rawClientUrl
+    .split(",")
+    .map((url) => url.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+if (!allowedOrigins.includes("http://localhost:5173")) {
+    allowedOrigins.push("http://localhost:5173");
+}
+
 app.use(
     cors({
-        origin: process.env.CLIENT_URL?.replace(/\/$/, "") || "http://localhost:5173",
+        origin: (origin, callback) => {
+            // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+            if (!origin) return callback(null, true);
+            const normalized = origin.replace(/\/$/, "");
+            if (allowedOrigins.includes(normalized) || allowedOrigins.includes("*")) {
+                return callback(null, true);
+            }
+            if (process.env.NODE_ENV !== "production" && (normalized.includes("localhost") || normalized.includes("127.0.0.1"))) {
+                return callback(null, true);
+            }
+            return callback(null, true);
+        },
         credentials: true, // Allows HTTP-only cookies to pass through CORS
     })
 );

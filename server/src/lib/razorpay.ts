@@ -24,14 +24,18 @@ export const razorpayRequest = async <T>(path: string, method: "GET" | "POST", b
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(15000),
     });
-    const data = await response.json().catch(() => null) as (T & { error?: { description?: string } }) | null;
+    const data = await response.json().catch(() => null) as (T & { error?: { description?: string; code?: string } }) | null;
     if (!response.ok || !data) {
         const description = data?.error?.description;
-        const message = response.status === 401
-            ? "Razorpay rejected the API credentials. Confirm RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are a matching test-mode pair in the server environment, then restart the server."
-            : description || `Razorpay request failed (${response.status}).`;
-        const error = new Error(message) as Error & { statusCode: number };
-        error.statusCode = response.status === 401 ? 503 : response.status === 429 ? 503 : 502;
+        let message = description || `Razorpay request failed (${response.status}).`;
+        if (response.status === 401 && !description) {
+            message = "Razorpay rejected the API credentials. Confirm RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are a matching test-mode pair in the server environment, then restart the server.";
+        }
+        const error = new Error(message) as Error & { statusCode: number; code?: string };
+        error.statusCode = response.status === 401 ? 401 : response.status === 429 ? 503 : 502;
+        if (data?.error?.code) {
+            error.code = data.error.code;
+        }
         throw error;
     }
     return data;
@@ -51,6 +55,15 @@ export const verifySubscriptionCheckoutSignature = (
 ) => {
     const { keySecret } = getCredentials();
     return verifyHmacSignature(`${paymentId}|${subscriptionId}`, signature, keySecret);
+};
+
+export const verifyOrderPaymentSignature = (
+    orderId: string,
+    paymentId: string,
+    signature: string,
+) => {
+    const { keySecret } = getCredentials();
+    return verifyHmacSignature(`${orderId}|${paymentId}`, signature, keySecret);
 };
 
 export const verifyWebhookSignature = (rawBody: Buffer, signature: string): boolean => {

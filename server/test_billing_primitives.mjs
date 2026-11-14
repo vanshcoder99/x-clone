@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { countCharacters, isAIActionAllowed, PLAN_CONFIG } from "./src/lib/plan-config.ts";
-import { verifyHmacSignature } from "./src/lib/razorpay.ts";
-import { verifySubscriptionCheckoutSignature } from "./src/lib/razorpay.ts";
+import { verifyHmacSignature, verifySubscriptionCheckoutSignature, verifyOrderPaymentSignature } from "./src/lib/razorpay.ts";
 
 assert.equal(PLAN_CONFIG.FREE.pricePaise, 0);
 assert.equal(PLAN_CONFIG.PLUS.pricePaise, 19900);
@@ -33,4 +32,9 @@ const subscriptionSignature = createHmac("sha256", secret).update("pay_test|sub_
 assert.equal(verifySubscriptionCheckoutSignature("sub_test", "pay_test", subscriptionSignature), true);
 assert.equal(verifySubscriptionCheckoutSignature("sub_other", "pay_test", subscriptionSignature), false);
 
-console.log("Billing primitives passed: plans, INR paise conversion, Unicode graphemes, AI gates, and HMAC validation.");
+const orderSignature = createHmac("sha256", secret).update("order_test|pay_test").digest("hex");
+assert.equal(verifyOrderPaymentSignature("order_test", "pay_test", orderSignature), true);
+assert.equal(verifyOrderPaymentSignature("order_other", "pay_test", orderSignature), false);
+assert.equal(verifyOrderPaymentSignature("order_test", "pay_other", orderSignature), false);
+
+console.log("Billing primitives passed: plans, INR paise conversion, Unicode graphemes, AI gates, subscription HMAC, and order HMAC validation.");
