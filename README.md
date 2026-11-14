@@ -7,6 +7,3 @@ A full-stack Twitter/X clone built with the PERN stack (PostgreSQL, Express, Rea
 - Backend: Node.js, Express, TypeScript
 - Database: PostgreSQL, Prisma ORM
 - AI: LLM API integration
-
-## Status
-🚧 In development
