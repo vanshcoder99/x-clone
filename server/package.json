@@ -6,7 +6,19 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test:auth": "node test_auth.mjs",
+    "test:social": "node test_user_social.mjs",
+    "test:tweets": "node test_tweets_threads.mjs",
+    "test:engagement": "node test_engagement_notifications.mjs",
+    "test:pagination": "node test_pagination_feed.mjs",
+    "test:dm": "node test_dm_realtime.mjs",
+    "test:media": "node test_media_cloudinary.mjs",
+    "test:privacy": "node test_account_privacy.mjs",
+    "test:message-access": "node test_mutual_follow_messages.mjs",
+    "test:billing-unit": "node --import tsx test_billing_primitives.mjs",
+    "test:billing-api": "node test_billing_api.mjs",
+    "test": "node test_auth.mjs && node test_user_social.mjs && node test_tweets_threads.mjs && node test_engagement_notifications.mjs && node test_pagination_feed.mjs && node test_dm_realtime.mjs && node test_media_cloudinary.mjs"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +28,7 @@
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "7.9.1",
     "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -23,8 +36,10 @@
     "firebase-admin": "^14.3.0",
     "google-auth-library": "^11.0.2",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.5.0",
     "pg": "^8.23.0",
-    "prisma": "7.9.1"
+    "prisma": "7.9.1",
+    "socket.io": "^4.8.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -32,8 +47,10 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.3.0",
     "@types/node": "^26.3.0",
     "@types/pg": "^8.23.1",
+    "socket.io-client": "^4.8.4",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   }

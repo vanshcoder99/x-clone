@@ -12,6 +12,10 @@ dist/
 # Prisma generated client (Prisma 7 custom output)
 generated/
 
+# Temporary media uploads (keep the folder marker only)
+server/uploads/*
+!server/uploads/.gitkeep
+
 # Logs
 *.log
 

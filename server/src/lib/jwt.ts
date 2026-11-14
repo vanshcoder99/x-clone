@@ -1,7 +1,16 @@
-import jwt from 'jsonwebtoken'
+import jwt from 'jsonwebtoken';
 
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+const getAccessSecret = (): string => {
+    const secret = process.env.JWT_ACCESS_SECRET;
+    if (!secret) throw new Error("JWT_ACCESS_SECRET is not defined in environment variables");
+    return secret;
+};
+
+const getRefreshSecret = (): string => {
+    const secret = process.env.JWT_REFRESH_SECRET;
+    if (!secret) throw new Error("JWT_REFRESH_SECRET is not defined in environment variables");
+    return secret;
+};
 
 export interface TokenPayload {
     userId: string;
@@ -9,21 +18,17 @@ export interface TokenPayload {
 }
 
 export const generateAccessToken = (payload: TokenPayload): string => {
-    if (!ACCESS_SECRET) throw new Error("ACCESS_SECRET not defined");
-    return jwt.sign(payload,ACCESS_SECRET,{expiresIn: "50m"});
-}
+    return jwt.sign(payload, getAccessSecret(), { expiresIn: "50m" });
+};
 
 export const generateRefreshToken = (payload: TokenPayload): string => {
-    if (!REFRESH_SECRET) throw new Error("REFRESH_SECRET not defined");
-    return jwt.sign(payload,REFRESH_SECRET,{expiresIn: "7d"});
-}
+    return jwt.sign(payload, getRefreshSecret(), { expiresIn: "7d" });
+};
 
 export const verifyAccessToken = (token: string): TokenPayload => {
-    if (!ACCESS_SECRET) throw new Error("ACCESS_SECRET not defined");
-    return jwt.verify(token,ACCESS_SECRET) as TokenPayload;
-}
+    return jwt.verify(token, getAccessSecret()) as TokenPayload;
+};
 
 export const verifyRefreshToken = (token: string): TokenPayload => {
-    if (!REFRESH_SECRET) throw new Error("REFRESH_SECRET not defined");
-    return jwt.verify(token,REFRESH_SECRET) as TokenPayload;
-}
+    return jwt.verify(token, getRefreshSecret()) as TokenPayload;
+};

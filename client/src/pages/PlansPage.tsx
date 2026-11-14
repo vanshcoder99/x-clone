@@ -3,7 +3,7 @@ import { ArrowRight, Check, CircleCheck, Loader2, Sparkles } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { api } from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../features/auth/hooks";
 
 interface Plan {
     tier: "FREE" | "PLUS" | "PRO";
@@ -41,6 +41,7 @@ export const PlansPage = () => {
     const [plans, setPlans] = useState<Plan[]>([]);
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
+    const [selectedTier, setSelectedTier] = useState<Plan["tier"] | null>(null);
     const [message, setMessage] = useState<{ kind: "success" | "error" | "info"; text: string } | null>(null);
 
     useEffect(() => {
@@ -130,9 +131,24 @@ export const PlansPage = () => {
                     <div className="grid items-stretch gap-4 lg:grid-cols-3">
                         {plans.map((plan) => {
                             const isCurrent = currentTier === plan.tier;
+                            const isSelected = selectedTier === plan.tier || (!selectedTier && isCurrent);
                             const recommended = plan.tier === "PLUS";
                             return (
-                                <article key={plan.tier} className={`relative flex flex-col rounded-3xl border bg-surface-primary p-5 sm:p-6 ${recommended ? "border-premium-violet/70 shadow-xl shadow-purple-950/30" : "border-border-dark"}`}>
+                                <article
+                                    key={plan.tier}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-pressed={isSelected}
+                                    aria-label={`Select the ${plan.name} plan`}
+                                    onClick={() => setSelectedTier(plan.tier)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            setSelectedTier(plan.tier);
+                                        }
+                                    }}
+                                    className={`plan-card group relative flex cursor-pointer flex-col rounded-3xl border p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl sm:p-6 ${isSelected ? `plan-card-selected ${recommended ? "plan-card-selected-recommended" : ""} -translate-y-1 ${recommended ? "border-premium-violet bg-premium-violet/10 shadow-xl shadow-purple-950/40" : "border-accent-blue bg-surface-hover shadow-xl shadow-accent-blue/15"}` : "border-border-dark bg-surface-primary hover:border-accent-blue/60 hover:bg-surface-hover hover:shadow-accent-blue/10"} ${recommended && !isSelected ? "border-premium-violet/70 shadow-xl shadow-purple-950/30 hover:border-premium-violet" : ""} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue`}
+                                >
                                     {recommended && <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-premium-violet px-3 py-1 text-[11px] font-extrabold text-black">RECOMMENDED</span>}
                                     <div className="mb-5 flex items-center justify-between">
                                         <h2 className="text-xl font-extrabold text-white">{plan.name}</h2>
@@ -142,7 +158,7 @@ export const PlansPage = () => {
                                         <span className="text-4xl font-extrabold text-white">₹{plan.priceInr}</span>
                                         <span className="text-sm text-text-muted">/ month</span>
                                     </div>
-                                    <div className="mb-5 space-y-2 rounded-2xl border border-border-dark bg-black/40 p-4 text-sm">
+                                    <div className="mb-5 space-y-2 rounded-2xl border border-border-dark bg-surface-secondary p-4 text-sm">
                                         <p className="flex justify-between gap-2"><span className="text-text-secondary">AI credits</span><strong className="text-white">{plan.monthlyCredits.toLocaleString()} / month</strong></p>
                                         <p className="flex justify-between gap-2"><span className="text-text-secondary">Post length</span><strong className="text-white">{plan.maxPostCharacters.toLocaleString()} characters</strong></p>
                                     </div>

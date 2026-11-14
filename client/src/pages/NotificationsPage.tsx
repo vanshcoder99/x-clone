@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { isAxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
 import {
     Heart,
@@ -11,7 +12,7 @@ import {
     Bell,
 } from "lucide-react";
 import { api } from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../features/auth/hooks";
 import type { NotificationItem } from "../types";
 
 export const NotificationsPage: React.FC = () => {
@@ -33,12 +34,14 @@ export const NotificationsPage: React.FC = () => {
         try {
             const { data } = await api.get("/notifications");
             setNotifications(data.notifications || []);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error fetching notifications:", err);
             const msg =
-                err?.code === "ECONNABORTED"
+                isAxiosError(err) && err.code === "ECONNABORTED"
                     ? "Request timed out while loading notifications. Please try again."
-                    : err?.response?.data?.error || "Unable to load notifications. Please try again.";
+                    : isAxiosError(err) && typeof err.response?.data?.error === "string"
+                    ? err.response.data.error
+                    : "Unable to load notifications. Please try again.";
             setError(msg);
         } finally {
             setLoading(false);
@@ -46,13 +49,12 @@ export const NotificationsPage: React.FC = () => {
     }, [user]);
 
     useEffect(() => {
-        if (!authLoading) {
-            if (user) {
-                fetchNotifications();
-            } else {
-                setLoading(false);
-            }
-        }
+        if (authLoading) return;
+        const timer = window.setTimeout(() => {
+            if (user) void fetchNotifications();
+            else setLoading(false);
+        }, 0);
+        return () => window.clearTimeout(timer);
     }, [user, authLoading, fetchNotifications]);
 
     const handleMarkAllRead = async () => {

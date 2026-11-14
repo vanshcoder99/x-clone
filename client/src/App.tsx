@@ -1,122 +1,69 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React from "react";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { Provider } from "react-redux";
+import { store } from "./store/store";
+import { AppStateBridge } from "./store/AppStateBridge";
+import { Sidebar } from "./components/Sidebar";
+import { RightSidebar } from "./components/RightSidebar";
 
-function App() {
-  const [count, setCount] = useState(0)
+// Pages
+import { FeedPage } from "./pages/FeedPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { TweetDetailPage } from "./pages/TweetDetailPage";
+import { ExplorePage } from "./pages/ExplorePage";
+import { BookmarksPage } from "./pages/BookmarksPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
+import { MessagesPage } from "./pages/MessagesPage";
+import { AuthPage } from "./pages/AuthPage";
+import { PlansPage } from "./pages/PlansPage";
+import { BillingPage } from "./pages/BillingPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { HelpCenterPage } from "./pages/HelpCenterPage";
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+const MainLayout: React.FC = () => {
+    const location = useLocation();
+    const isMessagesPage = location.pathname.startsWith("/messages");
+    const isFocusedPage = ["/plans", "/settings/billing", "/settings", "/help"].includes(location.pathname);
+    const navigate = useNavigate();
+
+    return (
+        <div className={`${isMessagesPage ? "messages-app-layout" : "app-container"} flex justify-center w-full min-h-screen md:h-screen md:h-dvh ${isMessagesPage ? "max-w-none pb-0" : "max-w-[1280px] mx-auto pb-16"} md:overflow-hidden md:pb-0`}>
+            {/* Left Navigational Rail */}
+            <Sidebar onOpenPremiumModal={() => navigate("/plans")} />
+
+            {/* Central Content */}
+            <Routes>
+                <Route path="/" element={<FeedPage />} />
+                <Route path="/profile/:username" element={<ProfilePage onOpenPremiumModal={() => navigate("/plans")} />} />
+                <Route path="/tweet/:id" element={<TweetDetailPage />} />
+                <Route path="/explore" element={<ExplorePage />} />
+                <Route path="/bookmarks" element={<BookmarksPage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/messages" element={<MessagesPage />} />
+                <Route path="/plans" element={<PlansPage />} />
+                <Route path="/settings/billing" element={<BillingPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/help" element={<HelpCenterPage />} />
+                <Route path="/auth" element={<AuthPage />} />
+            </Routes>
+
+            {/* Right Widget Column (Hidden on Messages view for maximum chat real-estate) */}
+            {!isMessagesPage && !isFocusedPage && (
+                <RightSidebar onOpenPremiumModal={() => navigate("/plans")} />
+            )}
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    );
+};
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+export function App() {
+    return (
+        <Provider store={store}>
+            <BrowserRouter>
+                <AppStateBridge />
+                <MainLayout />
+            </BrowserRouter>
+        </Provider>
+    );
 }
 
-export default App
+export default App;

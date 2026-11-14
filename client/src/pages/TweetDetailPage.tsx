@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { api } from "../api/client";
 import { TweetCard } from "../components/TweetCard";
 import { Composer } from "../components/Composer";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../features/auth/hooks";
 import type { Tweet } from "../types";
 
 export const TweetDetailPage: React.FC = () => {

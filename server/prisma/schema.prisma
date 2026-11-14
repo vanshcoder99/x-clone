@@ -8,18 +8,20 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  email     String   @unique
-  password  String?  // null for Google-only users
-  provider  AuthProvider @default(LOCAL)
-  firebaseUid String? @unique // only set for Google users
-  bio       String?
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String       @id @default(cuid())
+  name        String?
+  username    String       @unique
+  email       String       @unique
+  password    String? // null for Google-only users
+  provider    AuthProvider @default(LOCAL)
+  firebaseUid String?      @unique // only set for Google users
+  bio         String?
+  avatarUrl   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   isVerified   Boolean       @default(false)
+  isPrivate    Boolean       @default(false)
   subscription Subscription?
 
   refreshTokens RefreshToken[]
@@ -28,14 +30,24 @@ model User {
   retweets      Retweet[]
   bookmarks     Bookmark[]
 
-  followers Follow[] @relation("Followers")
-  following Follow[] @relation("Following")
+  followers              Follow[]        @relation("Followers")
+  following              Follow[]        @relation("Following")
+  sentFollowRequests     FollowRequest[] @relation("FollowRequestRequester")
+  receivedFollowRequests FollowRequest[] @relation("FollowRequestTarget")
 
   blocking  Block[] @relation("Blocking")
   blockedBy Block[] @relation("BlockedBy")
 
   notifications          Notification[] @relation("NotificationRecipient")
   triggeredNotifications Notification[] @relation("NotificationSource")
+
+  conversations         ConversationParticipant[]
+  messagesSent          Message[]
+  pendingUploads        PendingUpload[]
+  billingPayments       BillingPayment[]
+  razorpaySubscriptions RazorpaySubscription[]
+  aiUsagePeriods        AiUsagePeriod[]
+  creditTransactions    CreditTransaction[]
 }
 
 enum AuthProvider {
@@ -50,6 +62,8 @@ model RefreshToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Tweet {
@@ -72,6 +86,39 @@ model Tweet {
   bookmarks     Bookmark[]
   notifications Notification[]
   hashtags      TweetHashtag[]
+  media         TweetMedia[]
+
+  @@index([authorId, createdAt])
+  @@index([parentTweetId, createdAt])
+}
+
+model TweetMedia {
+  id        String    @id @default(cuid())
+  tweetId   String
+  tweet     Tweet     @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  url       String
+  publicId  String?
+  mediaType MediaType @default(IMAGE)
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([tweetId, order])
+}
+
+model PendingUpload {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicId     String    @unique
+  url          String?
+  folder       String
+  resourceType String    @default("image")
+  mediaType    MediaType @default(IMAGE)
+  status       String    @default("PENDING") // PENDING, CONSUMED, EXPIRED
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+
+  @@index([userId, status])
 }
 
 enum MediaType {
@@ -89,6 +136,7 @@ model Like {
   createdAt DateTime @default(now())
 
   @@unique([userId, tweetId])
+  @@index([tweetId])
 }
 
 model Retweet {
@@ -101,6 +149,7 @@ model Retweet {
   createdAt    DateTime @default(now())
 
   @@unique([userId, tweetId])
+  @@index([tweetId])
 }
 
 model Follow {
@@ -112,29 +161,141 @@ model Follow {
   createdAt   DateTime @default(now())
 
   @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+model FollowRequest {
+  id          String              @id @default(cuid())
+  requesterId String
+  requester   User                @relation("FollowRequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  targetId    String
+  target      User                @relation("FollowRequestTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  status      FollowRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([requesterId, targetId])
+  @@index([targetId, status, createdAt])
+  @@index([requesterId, status, createdAt])
+}
+
+enum FollowRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELED
+}
+
+enum ConversationStatus {
+  ACTIVE
+  PENDING
 }
 
 enum SubscriptionTier {
   FREE
+  PLUS
+  PRO
   PREMIUM
 }
 
 enum SubscriptionStatus {
+  PENDING
   ACTIVE
   EXPIRED
   CANCELLED
+  HALTED
+  COMPLETED
 }
 
 model Subscription {
   id        String             @id @default(cuid())
   userId    String             @unique
   user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tier      SubscriptionTier   @default(PREMIUM)
+  tier      SubscriptionTier   @default(FREE)
   status    SubscriptionStatus @default(ACTIVE)
   startDate DateTime           @default(now())
   endDate   DateTime?
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
+}
+
+model RazorpaySubscription {
+  id                     String             @id @default(cuid())
+  userId                 String
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier                   SubscriptionTier
+  razorpaySubscriptionId String             @unique
+  razorpayPlanId         String
+  status                 SubscriptionStatus
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  payments               BillingPayment[]
+
+  @@index([userId, status, createdAt])
+}
+
+model BillingPayment {
+  id                        String                @id @default(cuid())
+  userId                    String
+  user                      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  razorpaySubscriptionRowId String?
+  razorpaySubscription      RazorpaySubscription? @relation(fields: [razorpaySubscriptionRowId], references: [id], onDelete: SetNull)
+  razorpayPaymentId         String                @unique
+  razorpaySubscriptionId    String?
+  amount                    Int
+  currency                  String                @default("INR")
+  status                    String
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([razorpaySubscriptionId])
+}
+
+model ProcessedWebhookEvent {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  event       String
+  payload     Json
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([event, receivedAt])
+}
+
+model AiUsagePeriod {
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  periodStart  DateTime
+  periodEnd    DateTime
+  creditsUsed  Int                 @default(0)
+  transactions CreditTransaction[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([userId, periodStart])
+  @@index([userId, periodEnd])
+}
+
+model CreditTransaction {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usagePeriodId  String
+  usagePeriod    AiUsagePeriod @relation(fields: [usagePeriodId], references: [id], onDelete: Cascade)
+  amount         Int
+  type           String
+  description    String
+  idempotencyKey String        @unique
+  response       String?
+  createdAt      DateTime      @default(now())
+
+  @@index([userId, createdAt])
+  @@index([usagePeriodId, createdAt])
 }
 
 model Bookmark {
@@ -157,6 +318,7 @@ model Block {
   createdAt DateTime @default(now())
 
   @@unique([blockerId, blockedId])
+  @@index([blockedId])
 }
 
 model Notification {
@@ -170,12 +332,18 @@ model Notification {
   tweet        Tweet?           @relation(fields: [tweetId], references: [id], onDelete: Cascade)
   read         Boolean          @default(false)
   createdAt    DateTime         @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, read])
 }
 
 enum NotificationType {
   LIKE
   RETWEET
   FOLLOW
+  FOLLOW_REQUEST
+  FOLLOW_REQUEST_ACCEPTED
+  FOLLOW_REQUEST_REJECTED
   REPLY
 }
 
@@ -192,4 +360,45 @@ model TweetHashtag {
   hashtag   Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
 
   @@id([tweetId, hashtagId])
+  @@index([hashtagId])
+}
+
+model Conversation {
+  id           String                    @id @default(cuid())
+  directKey    String?                   @unique
+  status       ConversationStatus        @default(ACTIVE)
+  requestedById String?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hasReadLatest  Boolean      @default(true)
+  lastReadAt     DateTime?
+  archivedAt     DateTime?
+  joinedAt       DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([userId, archivedAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String
+  mediaUrl       String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
 }

@@ -6,14 +6,16 @@ import { TweetCard } from "../components/TweetCard";
 import { ReplyModal } from "../components/ReplyModal";
 import { Pagination } from "../components/Pagination";
 import { TweetSkeleton } from "../components/TweetSkeleton";
-import { useAuth } from "../context/AuthContext";
-import { useSocket } from "../context/SocketContext";
+import { useAuth } from "../features/auth/hooks";
+import { useSocket } from "../features/socket/hooks";
 import type { Tweet } from "../types";
-import { AlertCircle, Feather } from "lucide-react";
-import logoImg from "../assets/logo.png";
+import { AlertCircle, Feather, Sun, Moon } from "lucide-react";
+import { useTheme } from "../features/theme/hooks";
+import logoImg from "../assets/socialsphere-mark.svg";
 
 export const FeedPage: React.FC = () => {
     const { user } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const { latestTweet, clearLatestTweet } = useSocket();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -27,17 +29,17 @@ export const FeedPage: React.FC = () => {
     const rawPage = parseInt(searchParams.get("page") || "1", 10);
     const currentPage = isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
 
+    // Component state
     const [tweets, setTweets] = useState<Tweet[]>([]);
     const [totalCount, setTotalCount] = useState<number>(0);
     const [totalPages, setTotalPages] = useState<number>(1);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-
     const [replyingTweet, setReplyingTweet] = useState<Tweet | null>(null);
 
     const limit = 10;
 
-    // Fetch feed for the selected page & tab (replaces existing page entirely)
+    // Unified Data Fetcher for Page-by-Page Feed
     const fetchFeed = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -52,26 +54,26 @@ export const FeedPage: React.FC = () => {
             const receivedTotal: number = data.pagination?.totalCount ?? 0;
             const calculatedTotalPages = Math.max(1, Math.ceil(receivedTotal / limit));
 
+            // Strictly replace the page content (page-by-page semantics)
             setTweets(receivedTweets);
             setTotalCount(receivedTotal);
             setTotalPages(calculatedTotalPages);
-
-            // Handle edge case: if current page exceeds total pages after data changes, navigate to last valid page
-            if (currentPage > calculatedTotalPages && calculatedTotalPages > 0) {
-                setSearchParams({ tab: activeTab, page: String(calculatedTotalPages) });
-            }
         } catch (err: any) {
-            console.error("Error fetching feed:", err);
+            console.error("Error loading feed:", err);
             const msg =
                 err?.code === "ECONNABORTED"
-                    ? "Request timed out while loading posts. Please try again."
-                    : err?.response?.data?.error || "Unable to load posts at this time. Please try again.";
+                    ? "Request timed out while loading posts. Please check your connection."
+                    : err?.response?.data?.error || "Failed to load posts. Please try again.";
             setError(msg);
+            setTweets([]);
+            setTotalCount(0);
+            setTotalPages(1);
         } finally {
             setLoading(false);
         }
-    }, [activeTab, currentPage, limit, setSearchParams]);
+    }, [activeTab, currentPage, limit]);
 
+    // Fetch posts whenever tab or page changes
     useEffect(() => {
         fetchFeed();
     }, [fetchFeed]);
@@ -141,12 +143,12 @@ export const FeedPage: React.FC = () => {
     };
 
     return (
-        <main className="center-column">
+        <main className="center-column w-full md:w-[630px] min-h-screen md:min-h-0 md:h-full md:overflow-y-auto md:overflow-x-hidden relative border-r border-border-dark flex-shrink-0 md:scroll-smooth">
             {/* Header with For You / Following tabs */}
-            <div className="feed-header">
+            <div className="feed-header sticky top-0 z-30 bg-black/90 backdrop-blur-md border-b border-border-dark w-full">
                 {/* Mobile Top Header (Visible on < 768px, Reference 3) */}
-                <div className="mobile-top-bar">
-                    <div className="mobile-top-left">
+                <div className="flex md:hidden items-center justify-between px-4 py-2.5 border-b border-border-dark bg-black/90 backdrop-blur-md">
+                    <div className="w-8">
                         {user ? (
                             <img
                                 src={
@@ -154,46 +156,65 @@ export const FeedPage: React.FC = () => {
                                     `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}`
                                 }
                                 alt={user.username}
-                                className="mobile-top-avatar"
+                                className="w-8 h-8 rounded-full object-cover cursor-pointer"
                                 onClick={() => navigate(`/profile/${user.username}`)}
                             />
                         ) : (
                             <button
                                 onClick={() => navigate("/auth")}
-                                className="mobile-top-signin"
+                                className="bg-transparent text-accent-blue border border-accent-blue rounded-full px-3 py-1 text-xs font-bold cursor-pointer"
                             >
                                 Sign in
                             </button>
                         )}
                     </div>
-                    <div className="mobile-top-brand" onClick={() => handleTabChange("for-you")}>
-                        <div className="mobile-top-logo-wrapper">
-                            <img src={logoImg} alt="SocialSphere" className="mobile-top-logo" />
+                    <div
+                        className="flex items-center gap-2 cursor-pointer"
+                        onClick={() => handleTabChange("for-you")}
+                    >
+                        <div className="w-8 h-8 aspect-square rounded-full overflow-hidden bg-surface-primary border border-accent-blue/30 flex items-center justify-center p-1 flex-shrink-0 shadow-sm">
+                            <img src={logoImg} alt="SocialSphere" className="w-full h-full object-contain rounded-full block" />
                         </div>
-                        <span className="mobile-top-title">SocialSphere</span>
+                        <span className="font-extrabold text-lg text-white tracking-tight">SocialSphere</span>
                     </div>
-                    <div className="mobile-top-right" />
+                    <button
+                        onClick={toggleTheme}
+                        className="w-8 h-8 flex items-center justify-center text-text-muted hover:text-white transition-colors cursor-pointer"
+                        title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    >
+                        {theme === "dark" ? (
+                            <Sun size={19} className="text-amber-400" />
+                        ) : (
+                            <Moon size={19} className="text-accent-blue" />
+                        )}
+                    </button>
                 </div>
 
-                <div className="feed-tabs" role="tablist">
+                <div className="flex bg-transparent" role="tablist">
                     <button
                         role="tab"
                         aria-selected={activeTab === "for-you"}
-                        className={`feed-tab ${activeTab === "for-you" ? "active" : ""}`}
+                        className={`flex-1 py-3.5 text-center font-bold text-sm transition-colors relative cursor-pointer ${
+                            activeTab === "for-you"
+                                ? "text-white after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-16 after:h-1 after:bg-accent-blue after:rounded-full"
+                                : "text-text-muted hover:text-gray-200 hover:bg-white/[0.03]"
+                        }`}
                         onClick={() => handleTabChange("for-you")}
                     >
-                        For you
+                        For You
                     </button>
-                    {user && (
-                        <button
-                            role="tab"
-                            aria-selected={activeTab === "following"}
-                            className={`feed-tab ${activeTab === "following" ? "active" : ""}`}
-                            onClick={() => handleTabChange("following")}
-                        >
-                            Following
-                        </button>
-                    )}
+                    <button
+                        role="tab"
+                        aria-selected={activeTab === "following"}
+                        className={`flex-1 py-3.5 text-center font-bold text-sm transition-colors relative cursor-pointer ${
+                            activeTab === "following"
+                                ? "text-white after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-16 after:h-1 after:bg-accent-blue after:rounded-full"
+                                : "text-text-muted hover:text-gray-200 hover:bg-white/[0.03]"
+                        }`}
+                        onClick={() => handleTabChange("following")}
+                    >
+                        Following
+                    </button>
                 </div>
             </div>
 
@@ -204,25 +225,9 @@ export const FeedPage: React.FC = () => {
             {latestTweet && (
                 <div
                     onClick={handleLoadNewTweet}
-                    style={{
-                        position: "sticky",
-                        top: "60px",
-                        zIndex: 15,
-                        display: "flex",
-                        justifyContent: "center",
-                        margin: "10px 0",
-                    }}
+                    className="sticky top-16 z-20 flex justify-center my-2.5"
                 >
-                    <button
-                        className="tweet-btn-large"
-                        style={{
-                            borderRadius: "9999px",
-                            padding: "8px 20px",
-                            fontSize: "0.85rem",
-                            boxShadow: "0 6px 20px rgba(29, 155, 240, 0.4)",
-                            cursor: "pointer",
-                        }}
-                    >
+                    <button className="bg-accent-blue hover:bg-accent-blue-hover text-white rounded-full py-2 px-5 text-xs font-bold shadow-lg shadow-accent-blue/35 transition-all cursor-pointer flex items-center gap-1.5">
                         ✨ New post from @{latestTweet.author.username} — Click to view
                     </button>
                 </div>
@@ -232,25 +237,24 @@ export const FeedPage: React.FC = () => {
             {loading ? (
                 <TweetSkeleton count={4} />
             ) : error ? (
-                <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-secondary)" }}>
-                    <AlertCircle size={36} color="#ef4444" style={{ margin: "0 auto 12px" }} />
-                    <h3 style={{ fontSize: "1.15rem", color: "var(--text-primary)", marginBottom: "8px" }}>
+                <div className="py-14 px-5 text-center text-text-secondary">
+                    <AlertCircle size={36} className="text-red-500 mx-auto mb-3" />
+                    <h3 className="text-base text-text-primary font-bold mb-2">
                         {error}
                     </h3>
                     <button
                         onClick={() => fetchFeed()}
-                        className="load-more-btn"
-                        style={{ marginTop: "12px" }}
+                        className="mt-3 bg-surface-secondary hover:bg-surface-hover border border-border-dark text-white font-bold text-sm py-2 px-5 rounded-full transition-all cursor-pointer"
                     >
                         Try Again
                     </button>
                 </div>
             ) : tweets.length === 0 ? (
-                <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-secondary)" }}>
-                    <h3 style={{ fontSize: "1.25rem", color: "var(--text-primary)", marginBottom: "8px" }}>
+                <div className="py-16 px-5 text-center text-text-secondary">
+                    <h3 className="text-lg font-bold text-text-primary mb-2">
                         {activeTab === "following" ? "Welcome to your timeline!" : "No posts yet"}
                     </h3>
-                    <p style={{ maxWidth: "340px", margin: "0 auto" }}>
+                    <p className="max-w-xs mx-auto text-sm text-text-muted">
                         {activeTab === "following"
                             ? "Follow some interesting creators to see their thoughts here."
                             : "Be the first to post a thought to SocialSphere!"}
@@ -292,7 +296,7 @@ export const FeedPage: React.FC = () => {
             {/* Mobile Floating Action Button (FAB) (Visible on < 768px, Reference 3) */}
             {user && (
                 <button
-                    className="mobile-fab"
+                    className="md:hidden fixed bottom-20 right-4 w-13 h-13 rounded-full bg-gradient-to-r from-accent-blue to-accent-blue-hover text-white flex items-center justify-center shadow-xl shadow-accent-blue/40 z-40 border-none cursor-pointer active:scale-95 transition-transform"
                     onClick={() => {
                         window.scrollTo({ top: 0, behavior: "smooth" });
                         const input = document.querySelector(".composer-input") as HTMLTextAreaElement | null;
